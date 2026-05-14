@@ -81,9 +81,13 @@ jobs:
       - name: Calculate SHA256 checksums
         id: checksums
         run: |
+          set -euo pipefail
+
+          sha256sum dist/*.tgz > dist/SHA256SUMS
+
           {
             echo "checksums<<EOF"
-            sha256sum dist/*.tgz
+            cat dist/SHA256SUMS
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
