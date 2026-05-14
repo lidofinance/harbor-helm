@@ -1,0 +1,123 @@
+name: Release patched Harbor Helm chart
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  CHART_NAME: harbor
+  OCI_REGISTRY: ghcr.io
+  OCI_NAMESPACE: ${{ github.repository_owner }}/helm-charts
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.18.6
+
+      - name: Resolve chart version
+        run: |
+          set -euo pipefail
+
+          chart_version="${GITHUB_REF_NAME#v}"
+
+          echo "CHART_VERSION=${chart_version}" >> "$GITHUB_ENV"
+
+      - name: Verify Chart.yaml version
+        run: |
+          set -euo pipefail
+
+          chart_version_from_file="$(awk '/^version:/ {print $2}' Chart.yaml)"
+
+          if [ "$chart_version_from_file" != "$CHART_VERSION" ]; then
+            echo "Chart.yaml version mismatch"
+            echo "Chart.yaml: $chart_version_from_file"
+            echo "Git tag:    $CHART_VERSION"
+            exit 1
+          fi
+
+      - name: Verify chart name
+        run: |
+          set -euo pipefail
+
+          chart_name_from_file="$(awk '/^name:/ {print $2}' Chart.yaml)"
+
+          if [ "$chart_name_from_file" != "$CHART_NAME" ]; then
+            echo "Chart name mismatch"
+            echo "Chart.yaml: $chart_name_from_file"
+            echo "Expected:   $CHART_NAME"
+            exit 1
+          fi
+
+      - name: Show release source
+        run: |
+          echo "Release tag: ${GITHUB_REF_NAME}"
+          echo "Source commit:"
+          git rev-parse HEAD
+
+      - name: Helm dependency update
+        run: |
+          helm dependency update .
+
+      - name: Helm lint
+        run: |
+          helm lint .
+
+      - name: Package chart
+        run: |
+          set -euo pipefail
+
+          mkdir -p dist
+
+          helm package . \
+            --destination dist
+
+      - name: Generate SHA256 checksums
+        run: |
+          sha256sum dist/*.tgz > dist/SHA256SUMS
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Harbor Helm chart ${{ env.CHART_VERSION }}
+          files: |
+            dist/*.tgz
+            dist/SHA256SUMS
+          body: |
+            Patched Harbor Helm chart.
+
+            Base:
+            - goharbor/harbor-helm v1.17.1
+
+            Changes:
+            - Added Trivy image digest support
+
+            Chart version:
+            - `${{ env.CHART_VERSION }}`
+
+      - name: Login to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+            helm registry login "${OCI_REGISTRY}" \
+              --username "${{ github.actor }}" \
+              --password-stdin
+
+      - name: Push chart to GHCR OCI registry
+        run: |
+          helm push \
+            "dist/${CHART_NAME}-${CHART_VERSION}.tgz" \
+            "oci://${OCI_REGISTRY}/${OCI_NAMESPACE}"
