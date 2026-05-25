@@ -1,0 +1,172 @@
+name: Release patched Harbor Helm chart
+
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+-*"
+
+permissions:
+  contents: write
+  pull-requests: read
+  packages: write
+
+env:
+  CHART_NAME: harbor
+  OCI_REPOSITORY: ghcr.io/${{ github.repository_owner }}/helm-charts
+
+jobs:
+  package-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install helm
+        run: |
+          set -euo pipefail
+
+          HELM_VERSION="3.18.6-1"
+
+          curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | \
+            gpg --dearmor | \
+            sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+
+          echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" | \
+            sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+
+          sudo apt update
+          sudo apt install -y helm=${HELM_VERSION}
+
+          helm version
+
+      - name: Extract version from tag
+        run: |
+          set -euo pipefail
+
+          CHART_VERSION="${GITHUB_REF#refs/tags/}"
+
+          echo "CHART_VERSION=${CHART_VERSION}" >> "$GITHUB_ENV"
+
+      - name: Verify chart metadata
+        run: |
+          set -euo pipefail
+
+          chart_name_from_file="$(awk '/^name:/ {print $2}' Chart.yaml)"
+          chart_version_from_file="$(awk '/^version:/ {print $2}' Chart.yaml)"
+
+          if [ "$chart_name_from_file" != "$CHART_NAME" ]; then
+            echo "Chart name mismatch: Chart.yaml name is $chart_name_from_file but expected $CHART_NAME"
+            exit 1
+          fi
+
+          if [ "$chart_version_from_file" != "$CHART_VERSION" ]; then
+            echo "Version mismatch: Chart.yaml version is $chart_version_from_file but tag is $CHART_VERSION"
+            exit 1
+          fi
+
+      - name: Run helm lint and package
+        run: |
+          set -euo pipefail
+
+          mkdir -p dist
+
+          helm dependency update .
+          helm lint .
+          helm package . --version "$CHART_VERSION" --destination dist
+
+      - name: Calculate SHA256 checksums
+        id: checksums
+        run: |
+          set -euo pipefail
+
+          sha256sum dist/*.tgz > dist/SHA256SUMS
+
+          {
+            echo "checksums<<EOF"
+            cat dist/SHA256SUMS
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Get commit messages
+        run: |
+          set -euo pipefail
+
+          previous_tag="$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)"
+
+          if [ -n "$previous_tag" ]; then
+            commit_messages="$(git log "${previous_tag}..HEAD" --oneline)"
+          else
+            commit_messages="$(git log --oneline -20)"
+          fi
+
+          {
+            echo "commit_message<<EOF"
+            echo "$commit_messages"
+            echo "EOF"
+          } >> "$GITHUB_ENV"
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref_name }}
+          body: |
+            Patched Harbor Helm chart.
+
+            Base:
+            - goharbor/harbor-helm 1.17 branch, chart 1.17.5
+
+            Changes:
+            - Added Trivy image digest support
+
+            Commits:
+            ```
+            ${{ env.commit_message }}
+            ```
+
+            SHA256 checksums:
+            ```
+            ${{ steps.checksums.outputs.checksums }}
+            ```
+          draft: false
+          prerelease: false
+
+      - name: Upload Harbor chart package
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/harbor-${{ env.CHART_VERSION }}.tgz
+          asset_name: harbor-${{ env.CHART_VERSION }}.tgz
+          asset_content_type: application/gzip
+
+      - name: Upload SHA256 checksums
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/SHA256SUMS
+          asset_name: SHA256SUMS
+          asset_content_type: text/plain
+
+      - name: Login to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+            helm registry login ghcr.io \
+              --username "${{ github.actor }}" \
+              --password-stdin
+
+      - name: Push chart to GHCR OCI registry
+        run: |
+          helm push \
+            "./dist/${CHART_NAME}-${CHART_VERSION}.tgz" \
+            "oci://${OCI_REPOSITORY}"
