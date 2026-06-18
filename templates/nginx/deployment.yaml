@@ -40,9 +40,10 @@ spec:
 {{- if .Values.nginx.serviceAccountName }}
       serviceAccountName: {{ .Values.nginx.serviceAccountName }}
 {{- end }}
+{{- with .Values.nginx.podSecurityContext }}
       securityContext:
-        runAsUser: 10000
-        fsGroup: 10000
+{{ toYaml . | indent 8 }}
+{{- end }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}

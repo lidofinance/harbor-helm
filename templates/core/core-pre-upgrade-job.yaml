@@ -20,9 +20,10 @@ spec:
         component: migrator
     spec:
       restartPolicy: Never
+{{- with .Values.core.podSecurityContext }}
       securityContext:
-        runAsUser: 10000
-        fsGroup: 10000
+{{ toYaml . | indent 8 }}
+{{- end }}
 {{- if .Values.core.serviceAccountName }}
       serviceAccountName: {{ .Values.core.serviceAccountName }}
 {{- end -}}

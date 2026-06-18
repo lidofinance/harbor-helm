@@ -510,6 +510,11 @@ nginx:
   podLabels: {}
   ## The priority class to run the pod as
   priorityClassName:
+  podSecurityContext:
+    runAsUser: 10000
+    runAsGroup: 10000
+    fsGroup: 10000
+    fsGroupChangePolicy: OnRootMismatch
 
 portal:
   image:
@@ -543,6 +548,11 @@ portal:
   serviceAnnotations: {}
   ## The priority class to run the pod as
   priorityClassName:
+  podSecurityContext:
+    runAsUser: 10000
+    runAsGroup: 10000
+    fsGroup: 10000
+    fsGroupChangePolicy: OnRootMismatch
   # containers to be run before the controller's container starts.
   initContainers: []
   # Example:
@@ -587,6 +597,11 @@ core:
   serviceAnnotations: {}
   ## The priority class to run the pod as
   priorityClassName:
+  podSecurityContext:
+    runAsUser: 10000
+    runAsGroup: 10000
+    fsGroup: 10000
+    fsGroupChangePolicy: OnRootMismatch
   # containers to be run before the controller's container starts.
   initContainers: []
   # Example:
@@ -670,6 +685,11 @@ jobservice:
   podLabels: {}
   ## The priority class to run the pod as
   priorityClassName:
+  podSecurityContext:
+    runAsUser: 10000
+    runAsGroup: 10000
+    fsGroup: 10000
+    fsGroupChangePolicy: OnRootMismatch
   # containers to be run before the controller's container starts.
   initContainers: []
   # Example:
@@ -742,6 +762,11 @@ registry:
   podLabels: {}
   ## The priority class to run the pod as
   priorityClassName:
+  podSecurityContext:
+    runAsUser: 10000
+    runAsGroup: 10000
+    fsGroup: 10000
+    fsGroupChangePolicy: OnRootMismatch
   # containers to be run before the controller's container starts.
   initContainers: []
   # Example:
@@ -830,6 +855,11 @@ trivy:
   podLabels: {}
   ## The priority class to run the pod as
   priorityClassName:
+  podSecurityContext:
+    runAsUser: 10000
+    runAsGroup: 10000
+    fsGroup: 10000
+    fsGroupChangePolicy: OnRootMismatch
   # containers to be run before the controller's container starts.
   initContainers: []
   # Example:
@@ -914,6 +944,11 @@ database:
     affinity: {}
     ## The priority class to run the pod as
     priorityClassName:
+    podSecurityContext:
+      runAsUser: 999
+      runAsGroup: 999
+      fsGroup: 999
+      fsGroupChangePolicy: OnRootMismatch
     # containers to be run before the controller's container starts.
     extrInitContainers: []
     # Example:
@@ -988,6 +1023,11 @@ redis:
     affinity: {}
     ## The priority class to run the pod as
     priorityClassName:
+    podSecurityContext:
+      runAsUser: 999
+      runAsGroup: 999
+      fsGroup: 999
+      fsGroupChangePolicy: OnRootMismatch
     # containers to be run before the controller's container starts.
     initContainers: []
     # Example:
@@ -1064,6 +1104,11 @@ exporter:
   topologySpreadConstraints: []
   ## The priority class to run the pod as
   priorityClassName:
+  podSecurityContext:
+    runAsUser: 10000
+    runAsGroup: 10000
+    fsGroup: 10000
+    fsGroupChangePolicy: OnRootMismatch
   # - maxSkew: 1
   #   topologyKey: topology.kubernetes.io/zone
   #   nodeTaintsPolicy: Honor

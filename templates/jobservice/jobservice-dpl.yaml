@@ -42,9 +42,10 @@ spec:
 {{ toYaml .Values.jobservice.podAnnotations | indent 8 }}
 {{- end }}
     spec:
+{{- with .Values.jobservice.podSecurityContext }}
       securityContext:
-        runAsUser: 10000
-        fsGroup: 10000
+{{ toYaml . | indent 8 }}
+{{- end }}
 {{- if .Values.jobservice.serviceAccountName }}
       serviceAccountName: {{ .Values.jobservice.serviceAccountName }}
 {{- end -}}

@@ -30,9 +30,10 @@ spec:
 {{ toYaml .Values.redis.podAnnotations | indent 8 }}
 {{- end }}
     spec:
+{{- with .Values.redis.internal.podSecurityContext }}
       securityContext:
-        runAsUser: 999
-        fsGroup: 999
+{{ toYaml . | indent 8 }}
+{{- end }}
 {{- if .Values.redis.internal.serviceAccountName }}
       serviceAccountName: {{ .Values.redis.internal.serviceAccountName }}
 {{- end -}}
